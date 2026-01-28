@@ -2,20 +2,29 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
-// Используем значения по умолчанию, чтобы избежать ошибок "URL is undefined"
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
+// Проверка наличия переменных окружения
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-// Инициализируем клиент только если ключи похожи на настоящие
-const isSupabaseConfigured = supabaseUrl.includes('supabase.co') && supabaseAnonKey !== 'placeholder';
-const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("⚠️ Ключи Supabase не найдены в process.env. Проверьте настройки Environment Variables в Vercel.");
+}
+
+// Инициализация клиента
+const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
+  : null;
 
 class ApiService {
   private isConnected = !!supabase;
   private channel: RealtimeChannel | null = null;
 
   async init() {
-    console.log(this.isConnected ? 'Connected to Supabase Cloud' : 'Running in Simulation Mode (Check Environment Variables)');
+    if (this.isConnected) {
+      console.log('✅ Подключено к Supabase Cloud');
+    } else {
+      console.error('❌ ОШИБКА: База данных не подключена. Приложение работает в демо-режиме.');
+    }
   }
 
   // Подписка на живые обновления
@@ -29,7 +38,7 @@ class ApiService {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'requests' },
           () => {
-            console.log('Realtime update received');
+            console.log('🔄 Получено обновление из БД');
             callback();
           }
         )
@@ -38,7 +47,7 @@ class ApiService {
       this.channel = channel;
       return channel;
     } catch (e) {
-      console.error("Failed to subscribe", e);
+      console.error("Ошибка подписки:", e);
       return null;
     }
   }
@@ -57,7 +66,7 @@ class ApiService {
       if (error) throw error;
       return data as User[];
     } catch (e) {
-      console.error('Error fetching users:', e);
+      console.error('Ошибка загрузки пользователей:', e);
       return [];
     }
   }
@@ -190,8 +199,7 @@ class ApiService {
   getSyncStatus() {
     return {
       connected: this.isConnected,
-      mode: this.isConnected ? 'SQL_LIVE' : 'SIMULATION',
-      storageUsed: this.isConnected ? 'Unlimited' : '5MB Limit'
+      mode: this.isConnected ? 'SQL_LIVE' : 'SIMULATION'
     };
   }
 }

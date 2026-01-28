@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { MaterialRequest, RequestStatus, AppRole, RequestItem, Expense } from '../types';
 import { ClockIcon, ExternalLinkIcon, TrashIcon, CameraIcon, EditIcon, BuildingIcon, WalletIcon, UserIcon } from './Icons';
@@ -70,26 +69,34 @@ const RequestCard: React.FC<RequestCardProps> = ({
     if (file) {
       try {
         setIsUploading(true);
-        // 1. Загрузка в облако
-        const cloudUrl = await api.uploadPhoto(file);
+
+        // Fix: Gemini Vision API's inlineData requires a base64 encoded string.
+        // We read the file locally to get base64 data while simultaneously uploading to Supabase.
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const [cloudUrl, base64Data] = await Promise.all([
+          api.uploadPhoto(file),
+          base64Promise
+        ]);
         
-        // 2. Интеллектуальный анализ через Gemini
+        // 2. Интеллектуальный анализ через Gemini с использованием base64 данных
         setIsAnalyzing(true);
         try {
-          const result = await analyzeReceipt(cloudUrl);
+          const result = await analyzeReceipt(base64Data);
           if (result.total) {
             setExpenseAmount(result.total.toString());
-            // Можно либо сразу сохранить, либо дать пользователю подтвердить. 
-            // Оставим в поле ввода для проверки.
+            // Мы оставляем сумму в поле ввода для подтверждения пользователем.
           }
         } catch (aiErr) {
           console.error("AI analysis failed, falling back to manual entry", aiErr);
         } finally {
           setIsAnalyzing(false);
         }
-
-        // Если форма уже была закрыта или мы хотим авто-сабмит, можно вызвать handleExpenseSubmit(cloudUrl);
-        // Но лучше оставить форму открытой, чтобы водитель видел результат работы ИИ.
       } catch (err) {
         alert("Ошибка загрузки. Проверьте соединение.");
       } finally {

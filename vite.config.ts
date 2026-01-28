@@ -1,21 +1,23 @@
-
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+// Fix: Explicitly import process from node:process to provide correct TypeScript definitions for process.cwd()
+import process from 'node:process';
 
 export default defineConfig(({ mode }) => {
-  // Fix: 'Property cwd does not exist on type Process'. 
-  // Using '.' as a safe alternative to process.cwd() for loadEnv in Vite config to resolve TS path recognition issues.
-  const env = loadEnv(mode, '.', '');
+  const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
     define: {
-      // Это позволяет использовать process.env.API_KEY в коде, как того требует SDK Gemini
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },
+    server: {
+      port: 3000,
+    },
     build: {
-      target: 'esnext'
+      target: 'esnext',
+      outDir: 'dist'
     }
   };
 });
