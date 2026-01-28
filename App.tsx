@@ -219,10 +219,8 @@ const App: React.FC = () => {
     return { active: active.sort(sortFn), archive: archive.sort(sortFn) };
   }, [requests, currentUser, sortBy]);
 
-  // Безопасная проверка переменных окружения
   const getEnvValid = (key: string) => {
     try {
-      // Ищем в process.env (в Vite прокидывается через define)
       const val = (process.env as any)[key];
       return !!val && val !== 'undefined' && val !== '';
     } catch {
@@ -265,7 +263,7 @@ const App: React.FC = () => {
           <div>
             <h1 className="text-2xl font-black text-indigo-900 tracking-tight">СтройЗакуп</h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${api.getSyncStatus().connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full ${api.getSyncStatus().connected ? 'bg-emerald-50 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-50 border-red-100'}`}></div>
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
                 {api.getSyncStatus().connected ? 'Система в сети' : 'Демо-режим'}
               </span>
@@ -391,7 +389,7 @@ const App: React.FC = () => {
                  <div className="mt-8 p-6 bg-slate-900 rounded-[2rem] text-white">
                     <p className="text-[10px] font-black uppercase text-indigo-400 mb-2 tracking-widest">Инструкция по исправлению</p>
                     <p className="text-xs leading-relaxed opacity-80">
-                      Белый экран часто вызван ошибками в переменных. Зайдите в Vercel -> Settings -> Environment Variables. 
+                      Белый экран часто вызван ошибками в переменных. Зайдите в Vercel &rarr; Settings &rarr; Environment Variables. 
                       Добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY. После этого нажмите "Redeploy".
                     </p>
                  </div>
@@ -405,7 +403,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Modal Management */}
       {isManagementModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -460,7 +457,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Form Request */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
