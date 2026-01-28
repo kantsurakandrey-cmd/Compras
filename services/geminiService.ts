@@ -5,7 +5,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 export const analyzeReceipt = async (base64Image: string): Promise<{ total?: number; items?: string[] }> => {
   // Always use new GoogleGenAI({ apiKey: process.env.API_KEY })
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = 'gemini-3-flash-preview';
+  // Using gemini-3-pro-preview for complex reasoning tasks such as structured receipt analysis.
+  const model = 'gemini-3-pro-preview';
 
   try {
     const response = await ai.models.generateContent({

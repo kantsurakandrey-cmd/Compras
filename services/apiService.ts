@@ -1,9 +1,16 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
-// В Vite переменные прокидываются через define в vite.config.ts
-const supabaseUrl = (process.env as any).VITE_SUPABASE_URL;
-const supabaseAnonKey = (process.env as any).VITE_SUPABASE_ANON_KEY;
+const getEnv = (key: string): string => {
+  try {
+    return (process.env as any)[key] || '';
+  } catch {
+    return '';
+  }
+};
+
+const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
 const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined');
 const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
@@ -16,7 +23,7 @@ class ApiService {
     if (this.isConnected) {
       console.log('✅ Подключено к Supabase');
     } else {
-      console.warn('⚠️ Работа в демо-режиме или ключи не настроены');
+      console.warn('⚠️ Работа в демо-режиме: ключи Supabase не настроены');
     }
   }
 
@@ -42,8 +49,14 @@ class ApiService {
 
   async getUsers(): Promise<User[]> {
     if (!supabase) return [];
-    const { data } = await supabase.from('users').select('*');
-    return (data || []) as User[];
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      return (data || []) as User[];
+    } catch (err) {
+      console.error("Failed to fetch users", err);
+      return [];
+    }
   }
 
   async saveUser(user: User): Promise<void> {
@@ -58,8 +71,14 @@ class ApiService {
 
   async getProjects(): Promise<Project[]> {
     if (!supabase) return [];
-    const { data } = await supabase.from('projects').select('*');
-    return (data || []).map(p => ({ id: p.id, name: p.name, isActive: p.is_active })) as Project[];
+    try {
+      const { data, error } = await supabase.from('projects').select('*');
+      if (error) throw error;
+      return (data || []).map(p => ({ id: p.id, name: p.name, isActive: p.is_active })) as Project[];
+    } catch (err) {
+      console.error("Failed to fetch projects", err);
+      return [];
+    }
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -79,18 +98,24 @@ class ApiService {
 
   async getRequests(): Promise<MaterialRequest[]> {
     if (!supabase) return [];
-    const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
-    return (data || []).map(r => ({
-      id: r.id.toString(),
-      userId: r.user_id,
-      userName: r.user_name,
-      projectName: r.project__name || r.project_name, // fallback для разных версий схемы
-      items: r.items,
-      expenses: r.expenses || [],
-      status: r.status,
-      createdAt: new Date(r.created_at).getTime(),
-      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined
-    })) as MaterialRequest[];
+    try {
+      const { data, error } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(r => ({
+        id: r.id.toString(),
+        userId: r.user_id,
+        userName: r.user_name,
+        projectName: r.project_name || 'Не указан',
+        items: r.items,
+        expenses: r.expenses || [],
+        status: r.status,
+        createdAt: new Date(r.created_at).getTime(),
+        completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined
+      })) as MaterialRequest[];
+    } catch (err) {
+      console.error("Failed to fetch requests", err);
+      return [];
+    }
   }
 
   async saveRequest(req: MaterialRequest): Promise<void> {
