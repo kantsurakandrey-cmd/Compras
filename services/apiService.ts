@@ -1,19 +1,13 @@
+
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
-const getEnv = (key: string): string => {
-  try {
-    return (process.env as any)[key] || '';
-  } catch {
-    return '';
-  }
-};
+// Используем переменные, проброшенные через Vite
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || '';
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
-
-const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined');
-const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL !== 'undefined' && SUPABASE_URL !== '');
+const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 class ApiService {
   private isConnected = !!supabase;
@@ -21,9 +15,9 @@ class ApiService {
 
   async init() {
     if (this.isConnected) {
-      console.log('✅ Подключено к Supabase');
+      console.log('✅ Supabase клиент инициализирован');
     } else {
-      console.warn('⚠️ Работа в демо-режиме: ключи Supabase не настроены');
+      console.error('❌ Supabase не настроен. Проверьте переменные окружения.');
     }
   }
 
@@ -47,6 +41,7 @@ class ApiService {
     }
   }
 
+  // --- USERS ---
   async getUsers(): Promise<User[]> {
     if (!supabase) return [];
     try {
@@ -54,21 +49,37 @@ class ApiService {
       if (error) throw error;
       return (data || []) as User[];
     } catch (err) {
-      console.error("Failed to fetch users", err);
+      console.error("Ошибка получения пользователей:", err);
       return [];
     }
   }
 
   async saveUser(user: User): Promise<void> {
     if (!supabase) return;
-    await supabase.from('users').insert([{ name: user.name, password: user.password, role: user.role }]);
+    try {
+      const { error } = await supabase.from('users').insert([{ 
+        name: user.name, 
+        password: user.password, 
+        role: user.role 
+      }]);
+      if (error) throw error;
+    } catch (e) {
+      console.error("Ошибка сохранения пользователя:", e);
+      alert("Ошибка БД: Возможно, таблица 'users' не создана.");
+    }
   }
 
   async deleteUser(id: string): Promise<void> {
     if (!supabase) return;
-    await supabase.from('users').delete().eq('id', id);
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
+  // --- PROJECTS ---
   async getProjects(): Promise<Project[]> {
     if (!supabase) return [];
     try {
@@ -76,26 +87,49 @@ class ApiService {
       if (error) throw error;
       return (data || []).map(p => ({ id: p.id, name: p.name, isActive: p.is_active })) as Project[];
     } catch (err) {
-      console.error("Failed to fetch projects", err);
+      console.error(err);
       return [];
     }
   }
 
   async saveProject(project: Project): Promise<void> {
     if (!supabase) return;
-    await supabase.from('projects').insert([{ name: project.name, is_active: project.isActive }]);
+    try {
+      const { error } = await supabase.from('projects').insert([{ 
+        name: project.name, 
+        is_active: project.isActive 
+      }]);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+      alert("Ошибка БД: Возможно, таблица 'projects' не создана.");
+    }
   }
 
   async updateProject(project: Project): Promise<void> {
     if (!supabase) return;
-    await supabase.from('projects').update({ is_active: project.isActive, name: project.name }).eq('id', project.id);
+    try {
+      const { error } = await supabase.from('projects').update({ 
+        is_active: project.isActive, 
+        name: project.name 
+      }).eq('id', project.id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async deleteProject(id: string): Promise<void> {
     if (!supabase) return;
-    await supabase.from('projects').delete().eq('id', id);
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
+  // --- REQUESTS ---
   async getRequests(): Promise<MaterialRequest[]> {
     if (!supabase) return [];
     try {
@@ -113,48 +147,69 @@ class ApiService {
         completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined
       })) as MaterialRequest[];
     } catch (err) {
-      console.error("Failed to fetch requests", err);
+      console.error(err);
       return [];
     }
   }
 
   async saveRequest(req: MaterialRequest): Promise<void> {
     if (!supabase) return;
-    await supabase.from('requests').insert([{
-      user_id: req.userId,
-      user_name: req.userName,
-      project_name: req.projectName,
-      items: req.items,
-      status: req.status
-    }]);
+    try {
+      const { error } = await supabase.from('requests').insert([{
+        user_id: req.userId,
+        user_name: req.userName,
+        project_name: req.projectName,
+        items: req.items,
+        status: req.status
+      }]);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+      alert("Ошибка БД: Возможно, таблица 'requests' не создана.");
+    }
   }
 
   async updateRequest(req: MaterialRequest): Promise<void> {
     if (!supabase) return;
-    await supabase.from('requests').update({
-      items: req.items,
-      status: req.status,
-      expenses: req.expenses,
-      completed_at: req.completedAt ? new Date(req.completedAt).toISOString() : null
-    }).eq('id', req.id);
+    try {
+      const { error } = await supabase.from('requests').update({
+        items: req.items,
+        status: req.status,
+        expenses: req.expenses,
+        completed_at: req.completedAt ? new Date(req.completedAt).toISOString() : null
+      }).eq('id', req.id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async deleteRequest(id: string): Promise<void> {
     if (!supabase) return;
-    await supabase.from('requests').delete().eq('id', id);
+    try {
+      const { error } = await supabase.from('requests').delete().eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async uploadPhoto(file: File): Promise<string> {
     if (!supabase) return '';
-    const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    const { error } = await supabase.storage.from('receipts').upload(fileName, file);
-    if (error) throw error;
-    const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
-    return publicUrl;
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const { error } = await supabase.storage.from('receipts').upload(fileName, file);
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      console.error(e);
+      return '';
+    }
   }
 
   getSyncStatus() {
-    return { connected: this.isConnected };
+    return { connected: !!supabase };
   }
 }
 
