@@ -220,10 +220,12 @@ const App: React.FC = () => {
     return { active: active.sort(sortFn), archive: archive.sort(sortFn) };
   }, [requests, currentUser, sortBy]);
 
+  // Fix: process.env variables are defined at build time via Vite's 'define' plugin. 
+  // Accessing them directly instead of through (window as any).process to allow static replacement.
   const envDiagnostics = {
-    supabaseUrl: !!(window as any).process?.env?.VITE_SUPABASE_URL,
-    supabaseKey: !!(window as any).process?.env?.VITE_SUPABASE_ANON_KEY,
-    geminiKey: !!(window as any).process?.env?.API_KEY
+    supabaseUrl: !!process.env.VITE_SUPABASE_URL,
+    supabaseKey: !!process.env.VITE_SUPABASE_ANON_KEY,
+    geminiKey: !!process.env.API_KEY
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-black text-indigo-900 animate-pulse uppercase tracking-widest">Проверка системы...</div>;

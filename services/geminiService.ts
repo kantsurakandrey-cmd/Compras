@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // AI analysis service for receipts
 export const analyzeReceipt = async (base64Image: string): Promise<{ total?: number; items?: string[] }> => {
@@ -19,16 +19,34 @@ export const analyzeReceipt = async (base64Image: string): Promise<{ total?: num
             }
           },
           {
-            text: "Analyze this construction receipt. Extract the total price and a list of items bought. Return ONLY a JSON object with keys 'total' (number) and 'items' (array of strings). Try to find values in any language, especially Russian if present."
+            text: "Analyze this construction receipt. Extract the total price and a list of items bought. Try to find values in any language, especially Russian if present."
           }
         ]
       },
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        // Using responseSchema for better reliability in structured data extraction as recommended by Google GenAI guidelines.
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            total: {
+              type: Type.NUMBER,
+              description: 'The total price on the receipt.',
+            },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.STRING,
+              },
+              description: 'The list of items bought.',
+            },
+          },
+          propertyOrdering: ["total", "items"],
+        },
       }
     });
 
-    // response.text is a property
+    // response.text is a property containing the generated JSON string.
     const text = response.text;
     if (text) {
       return JSON.parse(text);
