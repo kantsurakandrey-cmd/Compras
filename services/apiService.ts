@@ -2,12 +2,10 @@ import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
 // В Vite переменные прокидываются через define в vite.config.ts
-// Мы обращаемся к ним напрямую как к константам, которые будут заменены при сборке
 const supabaseUrl = (process.env as any).VITE_SUPABASE_URL;
 const supabaseAnonKey = (process.env as any).VITE_SUPABASE_ANON_KEY;
 
-// Инициализация клиента только если ключи валидны
-const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined');
+const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined');
 const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 class ApiService {
@@ -18,7 +16,7 @@ class ApiService {
     if (this.isConnected) {
       console.log('✅ Подключено к Supabase');
     } else {
-      console.warn('⚠️ Работа в демо-режиме (ключи БД не найдены)');
+      console.warn('⚠️ Работа в демо-режиме или ключи не настроены');
     }
   }
 
@@ -83,10 +81,10 @@ class ApiService {
     if (!supabase) return [];
     const { data } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
     return (data || []).map(r => ({
-      id: r.id,
+      id: r.id.toString(),
       userId: r.user_id,
       userName: r.user_name,
-      projectName: r.project_name,
+      projectName: r.project__name || r.project_name, // fallback для разных версий схемы
       items: r.items,
       expenses: r.expenses || [],
       status: r.status,
