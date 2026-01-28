@@ -1,23 +1,14 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
-// Используем безопасное получение переменных. 
-// В Vite они заменяются на этапе сборки через define в vite.config.ts
-const getEnv = (key: string): string | undefined => {
-  try {
-    return process.env[key];
-  } catch {
-    return undefined;
-  }
-};
-
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
+// В Vite переменные прокидываются через define в vite.config.ts
+// Мы обращаемся к ним напрямую как к константам, которые будут заменены при сборке
+const supabaseUrl = (process.env as any).VITE_SUPABASE_URL;
+const supabaseAnonKey = (process.env as any).VITE_SUPABASE_ANON_KEY;
 
 // Инициализация клиента только если ключи валидны
-const supabase = (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined') 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
-  : null;
+const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined');
+const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 class ApiService {
   private isConnected = !!supabase;
