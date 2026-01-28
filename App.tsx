@@ -222,8 +222,9 @@ const App: React.FC = () => {
   // Безопасная проверка переменных окружения
   const getEnvValid = (key: string) => {
     try {
-      const val = process.env[key];
-      return !!val && val !== 'undefined';
+      // Ищем в process.env (в Vite прокидывается через define)
+      const val = (process.env as any)[key];
+      return !!val && val !== 'undefined' && val !== '';
     } catch {
       return false;
     }
@@ -404,7 +405,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Modal Management (Keep existing code but with small fixes) */}
+      {/* Modal Management */}
       {isManagementModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -459,7 +460,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Form Request (Keep existing code) */}
+      {/* Form Request */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
