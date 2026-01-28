@@ -2,58 +2,64 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { MaterialRequest, User, Project, Expense } from '../types';
 
-// Accessing environment variables directly as they are injected by the build system (Vercel/Vite)
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+// Используем значения по умолчанию, чтобы избежать ошибок "URL is undefined"
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
 
-const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// Инициализируем клиент только если ключи похожи на настоящие
+const isSupabaseConfigured = supabaseUrl.includes('supabase.co') && supabaseAnonKey !== 'placeholder';
+const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 class ApiService {
   private isConnected = !!supabase;
   private channel: RealtimeChannel | null = null;
 
   async init() {
-    console.log(this.isConnected ? 'Connected to Supabase Cloud' : 'Running in Simulation Mode');
-    if (!this.isConnected) {
-      console.warn('Supabase keys are missing. Check your environment variables.');
-    }
+    console.log(this.isConnected ? 'Connected to Supabase Cloud' : 'Running in Simulation Mode (Check Environment Variables)');
   }
 
   // Подписка на живые обновления
   subscribeToRequests(callback: () => void) {
     if (!supabase) return null;
     
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'requests' },
-        () => {
-          console.log('Realtime update received');
-          callback();
-        }
-      )
-      .subscribe();
-    
-    this.channel = channel;
-    return channel;
+    try {
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'requests' },
+          () => {
+            console.log('Realtime update received');
+            callback();
+          }
+        )
+        .subscribe();
+      
+      this.channel = channel;
+      return channel;
+    } catch (e) {
+      console.error("Failed to subscribe", e);
+      return null;
+    }
   }
 
   unsubscribe() {
-    if (this.channel) {
-      supabase?.removeChannel(this.channel);
+    if (this.channel && supabase) {
+      supabase.removeChannel(this.channel);
     }
   }
 
   // --- ПОЛЬЗОВАТЕЛИ ---
   async getUsers(): Promise<User[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('users').select('*');
-    if (error) {
-      console.error('Error fetching users:', error);
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      return data as User[];
+    } catch (e) {
+      console.error('Error fetching users:', e);
       return [];
     }
-    return data as User[];
   }
 
   async saveUser(user: User): Promise<void> {
@@ -75,16 +81,17 @@ class ApiService {
   // --- ОБЪЕКТЫ ---
   async getProjects(): Promise<Project[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('projects').select('*');
-    if (error) {
-      console.error('Error fetching projects:', error);
+    try {
+      const { data, error } = await supabase.from('projects').select('*');
+      if (error) throw error;
+      return data.map(p => ({
+        id: p.id,
+        name: p.name,
+        isActive: p.is_active
+      })) as Project[];
+    } catch (e) {
       return [];
     }
-    return data.map(p => ({
-      id: p.id,
-      name: p.name,
-      isActive: p.is_active
-    })) as Project[];
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -114,23 +121,24 @@ class ApiService {
   // --- ЗАЯВКИ ---
   async getRequests(): Promise<MaterialRequest[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.error('Error fetching requests:', error);
+    try {
+      const { data, error } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      
+      return data.map(r => ({
+        id: r.id,
+        userId: r.user_id,
+        userName: r.user_name,
+        projectName: r.project_name,
+        items: r.items,
+        expenses: r.expenses || [],
+        status: r.status,
+        createdAt: new Date(r.created_at).getTime(),
+        completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined
+      })) as MaterialRequest[];
+    } catch (e) {
       return [];
     }
-    
-    return data.map(r => ({
-      id: r.id,
-      userId: r.user_id,
-      userName: r.user_name,
-      projectName: r.project_name,
-      items: r.items,
-      expenses: r.expenses || [],
-      status: r.status,
-      createdAt: new Date(r.created_at).getTime(),
-      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined
-    })) as MaterialRequest[];
   }
 
   async saveRequest(req: MaterialRequest): Promise<void> {
