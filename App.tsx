@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialRequest, RequestStatus, User, RequestItem, Expense, Project } from './types';
 import RequestCard from './components/RequestCard';
@@ -220,15 +219,23 @@ const App: React.FC = () => {
     return { active: active.sort(sortFn), archive: archive.sort(sortFn) };
   }, [requests, currentUser, sortBy]);
 
-  // Fix: process.env variables are defined at build time via Vite's 'define' plugin. 
-  // Accessing them directly instead of through (window as any).process to allow static replacement.
-  const envDiagnostics = {
-    supabaseUrl: !!process.env.VITE_SUPABASE_URL,
-    supabaseKey: !!process.env.VITE_SUPABASE_ANON_KEY,
-    geminiKey: !!process.env.API_KEY
+  // Безопасная проверка переменных окружения
+  const getEnvValid = (key: string) => {
+    try {
+      const val = process.env[key];
+      return !!val && val !== 'undefined';
+    } catch {
+      return false;
+    }
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-black text-indigo-900 animate-pulse uppercase tracking-widest">Проверка системы...</div>;
+  const envDiagnostics = {
+    supabaseUrl: getEnvValid('VITE_SUPABASE_URL'),
+    supabaseKey: getEnvValid('VITE_SUPABASE_ANON_KEY'),
+    geminiKey: getEnvValid('API_KEY')
+  };
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-black text-indigo-900 animate-pulse uppercase tracking-widest text-center px-4">Система загружается...</div>;
 
   if (!currentUser) {
     return (
@@ -243,7 +250,7 @@ const App: React.FC = () => {
             <button type="submit" className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition-all uppercase tracking-widest active:scale-[0.98]">Войти</button>
           </form>
           <div className="mt-8 pt-6 border-t border-slate-50 text-center">
-             <p className="text-[10px] font-bold text-slate-300 uppercase">Production v4.5 • Cloud Native</p>
+             <p className="text-[10px] font-bold text-slate-300 uppercase">Production v4.6 • Cloud Native</p>
           </div>
         </div>
       </div>
@@ -259,7 +266,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className={`w-1.5 h-1.5 rounded-full ${api.getSyncStatus().connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`}></div>
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                {api.getSyncStatus().connected ? 'Система в сети' : 'Офлайн режим'}
+                {api.getSyncStatus().connected ? 'Система в сети' : 'Демо-режим'}
               </span>
             </div>
           </div>
@@ -335,7 +342,7 @@ const App: React.FC = () => {
                </h3>
                
                <div className="grid grid-cols-1 gap-4">
-                 <div className={`p-4 rounded-3xl border flex items-center justify-between ${envDiagnostics.supabaseUrl && envDiagnostics.supabaseKey ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                 <div className={`p-4 rounded-3xl border flex items-center justify-between ${envDiagnostics.supabaseUrl ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${envDiagnostics.supabaseUrl ? 'bg-emerald-500' : 'bg-red-500'} text-white`}>
                         <DatabaseIcon />
@@ -343,7 +350,7 @@ const App: React.FC = () => {
                       <div>
                         <p className="text-[10px] font-black uppercase text-slate-400">База данных SQL</p>
                         <p className={`text-xs font-bold ${envDiagnostics.supabaseUrl ? 'text-emerald-700' : 'text-red-700'}`}>
-                          {envDiagnostics.supabaseUrl ? 'Подключено (Supabase)' : 'Ошибка VITE_SUPABASE_URL'}
+                          {envDiagnostics.supabaseUrl ? 'Подключено' : 'VITE_SUPABASE_URL не найден'}
                         </p>
                       </div>
                     </div>
@@ -358,11 +365,10 @@ const App: React.FC = () => {
                       <div>
                         <p className="text-[10px] font-black uppercase text-slate-400">Хранилище чеков</p>
                         <p className={`text-xs font-bold ${envDiagnostics.supabaseKey ? 'text-emerald-700' : 'text-red-700'}`}>
-                          {envDiagnostics.supabaseKey ? 'Доступ разрешен' : 'Ошибка VITE_SUPABASE_ANON_KEY'}
+                          {envDiagnostics.supabaseKey ? 'Активно' : 'VITE_SUPABASE_ANON_KEY не найден'}
                         </p>
                       </div>
                     </div>
-                    <div className={`w-3 h-3 rounded-full ${envDiagnostics.supabaseKey ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></div>
                  </div>
 
                  <div className={`p-4 rounded-3xl border flex items-center justify-between ${envDiagnostics.geminiKey ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
@@ -377,36 +383,28 @@ const App: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    {envDiagnostics.geminiKey ? (
-                       <div className="flex items-center gap-1">
-                          <span className="text-[8px] font-black text-emerald-600 uppercase">READY</span>
-                          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                       </div>
-                    ) : (
-                       <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse"></div>
-                    )}
                  </div>
                </div>
 
                {!envDiagnostics.supabaseUrl && (
                  <div className="mt-8 p-6 bg-slate-900 rounded-[2rem] text-white">
-                    <p className="text-[10px] font-black uppercase text-indigo-400 mb-2 tracking-widest">Инструкция Vercel</p>
+                    <p className="text-[10px] font-black uppercase text-indigo-400 mb-2 tracking-widest">Инструкция по исправлению</p>
                     <p className="text-xs leading-relaxed opacity-80">
-                      Зайдите в Settings -> Environment Variables и добавьте ключи из Supabase Dashboard. 
-                      После этого сделайте "Redeploy".
+                      Белый экран часто вызван ошибками в переменных. Зайдите в Vercel -> Settings -> Environment Variables. 
+                      Добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY. После этого нажмите "Redeploy".
                     </p>
                  </div>
                )}
             </div>
             
             <div className="text-center opacity-30">
-               <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">СтройЗакуп 4.5 • Production Build</p>
+               <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">СтройЗакуп 4.6 • Final Release</p>
             </div>
           </section>
         )}
       </main>
 
-      {/* Management Modal */}
+      {/* Modal Management (Keep existing code but with small fixes) */}
       {isManagementModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -461,7 +459,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Form Modal (Заявка) */}
+      {/* Form Request (Keep existing code) */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -500,7 +498,7 @@ const App: React.FC = () => {
       )}
       
       <footer className="px-6 py-5 bg-slate-50 border-t border-slate-100 text-center flex-shrink-0">
-         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">PRODUCTION v4.5 • READY FOR WORK</p>
+         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">PRODUCTION v4.6 • READY FOR WORK</p>
       </footer>
     </div>
   );
