@@ -58,8 +58,13 @@ const App: React.FC = () => {
       const savedSession = localStorage.getItem('stroy_session_v4');
       if (savedSession) {
         const session = JSON.parse(savedSession);
-        const found = u.find(user => user.name === session.name);
-        if (found) setCurrentUser(found);
+        // Если это был временный админ или сохраненный пользователь
+        if (session.name === 'admin' && !u.find(user => user.name === 'admin')) {
+           setCurrentUser(session);
+        } else {
+           const found = u.find(user => user.name === session.name);
+           if (found) setCurrentUser(found);
+        }
       }
       setIsLoading(false);
 
@@ -76,13 +81,25 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => u.name === loginName && u.password === loginPass);
+    
+    // 1. Пытаемся найти пользователя в загруженном списке из БД
+    let user = users.find(u => u.name.toLowerCase() === loginName.toLowerCase() && u.password === loginPass);
+    
+    // 2. Режим первого входа: если база пуста или мы заходим под admin/admin (как мастер-пароль)
+    if (!user && loginName.toLowerCase() === 'admin' && loginPass === 'admin') {
+      user = { 
+        id: 'master-admin', 
+        name: 'admin', 
+        role: 'PURCHASER' // Даем полные права для настройки системы
+      };
+    }
+
     if (user) {
       setCurrentUser(user);
       localStorage.setItem('stroy_session_v4', JSON.stringify(user));
       setLoginError('');
     } else {
-      setLoginError('Неверный логин или пароль');
+      setLoginError('Неверный логин или пароль. Попробуйте admin / admin');
     }
   };
 
@@ -106,7 +123,8 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (users.find(u => u.id === id)?.name === 'admin') return alert("Нельзя удалить админа");
+    const userToDelete = users.find(u => u.id === id);
+    if (userToDelete?.name === 'admin') return alert("Нельзя удалить системного админа");
     if (window.confirm("Удалить сотрудника?")) {
       await api.deleteUser(id);
       await refreshData();
@@ -243,8 +261,8 @@ const App: React.FC = () => {
           <h1 className="text-4xl font-black text-indigo-900 mb-2 text-center">СтройЗакуп</h1>
           <p className="text-[10px] font-black text-slate-400 uppercase text-center mb-10">Система снабжения</p>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input type="text" placeholder="Логин" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50 focus:border-indigo-300 transition-colors" value={loginName} onChange={e => setLoginName(e.target.value)} required />
-            <input type="password" placeholder="Пароль" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50 focus:border-indigo-300 transition-colors" value={loginPass} onChange={e => setLoginPass(e.target.value)} required />
+            <input type="text" placeholder="Логин (admin)" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50 focus:border-indigo-300 transition-colors" value={loginName} onChange={e => setLoginName(e.target.value)} required />
+            <input type="password" placeholder="Пароль (admin)" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50 focus:border-indigo-300 transition-colors" value={loginPass} onChange={e => setLoginPass(e.target.value)} required />
             {loginError && <p className="text-xs text-red-500 font-bold text-center">{loginError}</p>}
             <button type="submit" className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition-all uppercase tracking-widest active:scale-[0.98]">Войти</button>
           </form>
