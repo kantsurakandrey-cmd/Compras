@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { MaterialRequest, RequestStatus, AppRole, RequestItem, Expense } from '../types';
 import { ClockIcon, ExternalLinkIcon, TrashIcon, CameraIcon, EditIcon, BuildingIcon, WalletIcon, UserIcon } from './Icons';
@@ -9,6 +10,8 @@ interface RequestCardProps {
   role: AppRole;
   onUpdateItems: (requestId: string, items: RequestItem[]) => void;
   onAddExpense: (requestId: string, expense: Omit<Expense, 'id' | 'createdAt'>) => void;
+  onUpdateExpense?: (expense: Expense) => void;
+  onDeleteExpense?: (expenseId: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (request: MaterialRequest) => void;
   onCancel?: (id: string) => void;
@@ -37,6 +40,8 @@ const RequestCard: React.FC<RequestCardProps> = ({
   role, 
   onUpdateItems, 
   onAddExpense, 
+  onUpdateExpense,
+  onDeleteExpense,
   onDelete, 
   onEdit,
   onCancel,
@@ -44,8 +49,12 @@ const RequestCard: React.FC<RequestCardProps> = ({
 }) => {
   const isPurchaser = role === 'PURCHASER';
   const canEdit = !isPurchaser && (request.status === RequestStatus.PENDING || request.status === RequestStatus.PARTIAL);
+  
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [expenseAmount, setExpenseAmount] = useState('');
+  const [pendingReceiptUrl, setPendingReceiptUrl] = useState<string | undefined>(undefined);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -57,11 +66,40 @@ const RequestCard: React.FC<RequestCardProps> = ({
     onUpdateItems(request.id, newItems);
   };
 
-  const handleExpenseSubmit = (receiptImageUrl?: string, amountOverride?: number) => {
-    const finalAmount = amountOverride !== undefined ? amountOverride : (parseFloat(expenseAmount) || 0);
-    onAddExpense(request.id, { amount: finalAmount, receiptImage: receiptImageUrl });
+  const handleExpenseSubmit = () => {
+    const amount = parseFloat(expenseAmount) || 0;
+    
+    if (editingExpenseId && onUpdateExpense) {
+      const original = request.expenses.find(e => e.id === editingExpenseId);
+      if (original) {
+        onUpdateExpense({
+          ...original,
+          amount,
+          receiptImage: pendingReceiptUrl || original.receiptImage
+        });
+      }
+    } else {
+      onAddExpense(request.id, { 
+        amount, 
+        receiptImage: pendingReceiptUrl 
+      });
+    }
+
+    resetForm();
+  };
+
+  const resetForm = () => {
     setExpenseAmount('');
+    setPendingReceiptUrl(undefined);
+    setEditingExpenseId(null);
     setShowExpenseForm(false);
+  };
+
+  const handleStartEditExpense = (exp: Expense) => {
+    setEditingExpenseId(exp.id);
+    setExpenseAmount(exp.amount.toString());
+    setPendingReceiptUrl(exp.receiptImage);
+    setShowExpenseForm(true);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,8 +108,6 @@ const RequestCard: React.FC<RequestCardProps> = ({
       try {
         setIsUploading(true);
 
-        // Fix: Gemini Vision API's inlineData requires a base64 encoded string.
-        // We read the file locally to get base64 data while simultaneously uploading to Supabase.
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
@@ -84,21 +120,22 @@ const RequestCard: React.FC<RequestCardProps> = ({
           base64Promise
         ]);
         
-        // 2. Интеллектуальный анализ через Gemini с использованием base64 данных
+        // Сохраняем URL из облака во временное состояние
+        setPendingReceiptUrl(cloudUrl);
+        
         setIsAnalyzing(true);
         try {
           const result = await analyzeReceipt(base64Data);
           if (result.total) {
             setExpenseAmount(result.total.toString());
-            // Мы оставляем сумму в поле ввода для подтверждения пользователем.
           }
         } catch (aiErr) {
-          console.error("AI analysis failed, falling back to manual entry", aiErr);
+          console.error("AI analysis failed", aiErr);
         } finally {
           setIsAnalyzing(false);
         }
       } catch (err) {
-        alert("Ошибка загрузки. Проверьте соединение.");
+        alert("Ошибка загрузки фото. Проверьте бакет в Supabase.");
       } finally {
         setIsUploading(false);
       }
@@ -175,11 +212,6 @@ const RequestCard: React.FC<RequestCardProps> = ({
                 <div className="text-[10px] font-medium opacity-60 tracking-tight">{item.quantity}</div>
               </div>
             </div>
-            {item.link && (
-               <a href={item.link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-indigo-400 hover:text-indigo-600 transition-colors" onClick={e => e.stopPropagation()}>
-                 <ExternalLinkIcon />
-               </a>
-            )}
           </div>
         ))}
       </div>
@@ -191,9 +223,9 @@ const RequestCard: React.FC<RequestCardProps> = ({
              <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                <WalletIcon /> Чеки и затраты
              </div>
-             <span className="text-sm font-black text-slate-900">{totalSum.toLocaleString('ru-RU')} ₽</span>
+             <span className="text-sm font-black text-slate-900">{totalSum.toLocaleString('de-DE')} €</span>
            </div>
-           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
               {request.expenses.map((exp) => (
                 <div key={exp.id} className="flex-shrink-0 flex flex-col items-center">
                   <div className="relative group w-16 h-16">
@@ -202,13 +234,23 @@ const RequestCard: React.FC<RequestCardProps> = ({
                     ) : (
                       <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold">НЕТ ФОТО</div>
                     )}
-                    {exp.receiptImage && (
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg cursor-pointer transition-opacity" onClick={() => window.open(exp.receiptImage)}>
-                        <span className="text-[8px] text-white font-black uppercase">Открыть</span>
-                      </div>
-                    )}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 rounded-lg transition-opacity">
+                      {isPurchaser && (
+                        <>
+                          <button onClick={() => handleStartEditExpense(exp)} className="p-1.5 bg-white/20 rounded-md text-white hover:bg-white/40">
+                             <EditIcon />
+                          </button>
+                          <button onClick={() => onDeleteExpense?.(exp.id)} className="p-1.5 bg-red-500/80 rounded-md text-white hover:bg-red-600">
+                             <TrashIcon />
+                          </button>
+                        </>
+                      )}
+                      {!isPurchaser && exp.receiptImage && (
+                        <button onClick={() => window.open(exp.receiptImage)} className="text-[8px] text-white font-black uppercase">Открыть</button>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-[9px] font-black text-slate-600 mt-1.5">{exp.amount} ₽</span>
+                  <span className="text-[9px] font-black text-slate-600 mt-1.5">{exp.amount} €</span>
                 </div>
               ))}
            </div>
@@ -221,11 +263,6 @@ const RequestCard: React.FC<RequestCardProps> = ({
           <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-black uppercase tracking-widest">
             <ClockIcon /> Создано: {formatDateTime(request.createdAt)}
           </div>
-          {request.completedAt && (
-            <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-black uppercase tracking-widest">
-              <ClockIcon /> Завершено: {formatDateTime(request.completedAt)}
-            </div>
-          )}
         </div>
         
         <div className="flex justify-end gap-2">
@@ -233,12 +270,12 @@ const RequestCard: React.FC<RequestCardProps> = ({
               <>
                 <button 
                   onClick={() => {
-                    setShowExpenseForm(!showExpenseForm);
-                    setExpenseAmount('');
+                    if (showExpenseForm) resetForm();
+                    else setShowExpenseForm(true);
                   }}
                   className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-100 active:scale-95"
                 >
-                  {showExpenseForm ? 'Отмена' : '+ Чек / Сумма'}
+                  {showExpenseForm ? 'Отмена' : '+ Чек'}
                 </button>
                 {request.status !== RequestStatus.COMPLETED && (
                    <button 
@@ -250,45 +287,45 @@ const RequestCard: React.FC<RequestCardProps> = ({
                 )}
               </>
             )}
-            {isPurchaser && request.status === RequestStatus.PENDING && (
-              <button 
-                onClick={() => onCancel?.(request.id)}
-                className="px-3 py-1.5 border border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                Отмена
-              </button>
-            )}
         </div>
 
         {showExpenseForm && (
           <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 animate-in slide-in-from-top-2 mt-2">
             <div className="flex justify-between items-center mb-3">
-               <p className="text-[9px] font-black text-indigo-900/40 uppercase tracking-[0.2em]">Внести данные о покупке</p>
+               <p className="text-[9px] font-black text-indigo-900/40 uppercase tracking-[0.2em]">
+                 {editingExpenseId ? 'Редактировать расход' : 'Новый чек'}
+               </p>
                {isAnalyzing && (
-                 <span className="text-[8px] font-black text-indigo-600 animate-pulse uppercase">ИИ анализирует чек...</span>
+                 <span className="text-[8px] font-black text-indigo-600 animate-pulse uppercase">Анализ чека...</span>
                )}
             </div>
             <div className="flex gap-2">
               <input 
                 type="number" 
-                placeholder="Сумма ₽" 
+                placeholder="Сумма €" 
                 className={`flex-1 px-4 py-2 rounded-lg border text-sm font-black outline-none transition-colors ${isAnalyzing ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-indigo-200'}`}
                 value={expenseAmount}
                 onChange={e => setExpenseAmount(e.target.value)}
                 disabled={isUploading || isAnalyzing}
               />
               <label className={`flex items-center justify-center p-2.5 bg-white border border-indigo-200 rounded-lg cursor-pointer text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all ${(isUploading || isAnalyzing) ? 'opacity-50' : ''}`}>
-                <CameraIcon />
+                {pendingReceiptUrl ? <div className="w-4 h-4 bg-emerald-500 rounded-full" title="Фото прикреплено" /> : <CameraIcon />}
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} disabled={isUploading || isAnalyzing} />
               </label>
               <button 
-                onClick={() => handleExpenseSubmit()}
-                disabled={isUploading || isAnalyzing}
+                onClick={handleExpenseSubmit}
+                disabled={isUploading || isAnalyzing || !expenseAmount}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-50"
               >
                 ОК
               </button>
             </div>
+            {pendingReceiptUrl && (
+              <div className="mt-2 text-[8px] font-bold text-emerald-600 uppercase flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>
+                Фото готово к сохранению
+              </div>
+            )}
           </div>
         )}
       </div>

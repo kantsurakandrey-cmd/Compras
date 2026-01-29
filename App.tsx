@@ -109,8 +109,13 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (id === 'master-admin') return alert("Системный вход нельзя удалить");
-    if (window.confirm("Удалить сотрудника?")) { await api.deleteUser(id); await refreshData(); }
+    if (id === 'master-admin' || (currentUser && id === currentUser.id)) {
+      return alert("Вы не можете удалить самого себя или системного администратора");
+    }
+    if (window.confirm("Удалить сотрудника?")) { 
+      await api.deleteUser(id); 
+      await refreshData(); 
+    }
   };
 
   const handleAddProject = async () => {
@@ -166,6 +171,25 @@ const App: React.FC = () => {
     const req = requests.find(r => r.id === requestId);
     if (!req) return;
     await api.updateRequest({ ...req, expenses: [...req.expenses, { ...exp, id: Math.random().toString(36).substr(2, 9), createdAt: Date.now() }] });
+    await refreshData();
+  };
+
+  const handleDeleteExpense = async (requestId: string, expenseId: string) => {
+    const req = requests.find(r => r.id === requestId);
+    if (!req) return;
+    if (window.confirm("Удалить этот чек?")) {
+      await api.updateRequest({ ...req, expenses: req.expenses.filter(e => e.id !== expenseId) });
+      await refreshData();
+    }
+  };
+
+  const handleUpdateExpense = async (requestId: string, updatedExp: Expense) => {
+    const req = requests.find(r => r.id === requestId);
+    if (!req) return;
+    await api.updateRequest({ 
+      ...req, 
+      expenses: req.expenses.map(e => e.id === updatedExp.id ? updatedExp : e) 
+    });
     await refreshData();
   };
 
@@ -295,7 +319,20 @@ create table requests (
               )}
             </div>
             {filteredRequests.active.length === 0 ? <div className="text-center py-20 opacity-20 font-black uppercase text-sm tracking-[0.3em]">Пусто</div> : 
-              filteredRequests.active.map(req => <RequestCard key={req.id} request={req} role={currentUser.role} onUpdateItems={handleUpdateItems} onAddExpense={handleAddExpense} onDelete={handleDeleteRequest} onEdit={handleOpenForm} onMarkComplete={handleMarkComplete} />)
+              filteredRequests.active.map(req => (
+                <RequestCard 
+                  key={req.id} 
+                  request={req} 
+                  role={currentUser.role} 
+                  onUpdateItems={handleUpdateItems} 
+                  onAddExpense={handleAddExpense} 
+                  onDeleteExpense={(expId) => handleDeleteExpense(req.id, expId)}
+                  onUpdateExpense={(exp) => handleUpdateExpense(req.id, exp)}
+                  onDelete={handleDeleteRequest} 
+                  onEdit={handleOpenForm} 
+                  onMarkComplete={handleMarkComplete} 
+                />
+              ))
             }
           </section>
         )}
