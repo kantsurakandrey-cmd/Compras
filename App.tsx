@@ -28,7 +28,7 @@ const App: React.FC = () => {
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [formItems, setFormItems] = useState<RequestItem[]>([{ id: '1', name: '', quantity: '', isBought: false }]);
+  const [formItems, setFormItems] = useState<RequestItem[]>([{ id: '1', name: '', quantity: '', link: '', isBought: false }]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserPass, setNewUserPass] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
@@ -137,10 +137,13 @@ const App: React.FC = () => {
 
   const handleOpenForm = (req?: MaterialRequest) => {
     if (req) {
-      setEditingRequest(req); setSelectedProjectId(req.projectName); setFormItems(req.items);
+      setEditingRequest(req); 
+      setSelectedProjectId(req.projectName); 
+      setFormItems(req.items.map(item => ({ ...item, link: item.link || '' })));
     } else {
-      setEditingRequest(null); setSelectedProjectId(projects.filter(p => p.isActive)[0]?.name || '');
-      setFormItems([{ id: Math.random().toString(36).substr(2, 5), name: '', quantity: '', isBought: false }]);
+      setEditingRequest(null); 
+      setSelectedProjectId(projects.filter(p => p.isActive)[0]?.name || '');
+      setFormItems([{ id: Math.random().toString(36).substr(2, 5), name: '', quantity: '', link: '', isBought: false }]);
     }
     setIsFormOpen(true);
   };
@@ -412,16 +415,17 @@ const App: React.FC = () => {
               </select>
               <div className="space-y-4">
                 {formItems.map((item, index) => (
-                  <div key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 relative">
+                  <div key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 relative space-y-3">
                     <div className="flex gap-2">
                       <input type="text" placeholder="Материал" className="flex-1 px-4 py-3 rounded-xl border text-sm font-bold" value={item.name} onChange={e => { const n = [...formItems]; n[index].name = e.target.value; setFormItems(n); }} required />
                       <input type="text" placeholder="К-во" className="w-24 px-4 py-3 rounded-xl border text-sm font-bold" value={item.quantity} onChange={e => { const n = [...formItems]; n[index].quantity = e.target.value; setFormItems(n); }} required />
                     </div>
-                    {formItems.length > 1 && <button type="button" onClick={() => setFormItems(formItems.filter(i => i.id !== item.id))} className="absolute -right-2 -top-2 bg-white text-red-400 p-2 rounded-full border">✕</button>}
+                    <input type="url" placeholder="Ссылка на товар (необязательно)" className="w-full px-4 py-3 rounded-xl border text-[11px] font-medium text-indigo-600" value={item.link || ''} onChange={e => { const n = [...formItems]; n[index].link = e.target.value; setFormItems(n); }} />
+                    {formItems.length > 1 && <button type="button" onClick={() => setFormItems(formItems.filter(i => i.id !== item.id))} className="absolute -right-2 -top-2 bg-white text-red-400 p-2 rounded-full border shadow-sm z-10">✕</button>}
                   </div>
                 ))}
               </div>
-              <button type="button" onClick={() => setFormItems([...formItems, { id: Math.random().toString(36).substr(2, 5), name: '', quantity: '', isBought: false }])} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest">+ Еще позиция</button>
+              <button type="button" onClick={() => setFormItems([...formItems, { id: Math.random().toString(36).substr(2, 5), name: '', quantity: '', link: '', isBought: false }])} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:border-indigo-300 transition-all">+ Еще позиция</button>
               <button type="submit" className="w-full bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black uppercase shadow-2xl active:scale-95 transition-all text-[11px] tracking-widest">Отправить в снабжение</button>
             </form>
           </div>

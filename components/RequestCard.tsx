@@ -199,16 +199,30 @@ const RequestCard: React.FC<RequestCardProps> = ({
               item.isBought ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
             } ${isPurchaser ? 'cursor-pointer hover:border-indigo-200' : ''}`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full">
               {isPurchaser && (
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                <div className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-all ${
                   item.isBought ? 'bg-emerald-500 border-emerald-500 text-white scale-110' : 'bg-white border-slate-300'
                 }`}>
                   {item.isBought && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                 </div>
               )}
-              <div className={item.isBought ? 'line-through text-slate-400' : 'text-slate-800'}>
-                <div className="font-bold text-sm leading-tight">{item.name}</div>
+              <div className={`flex-1 ${item.isBought ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                <div className="flex items-center gap-2">
+                  <div className="font-bold text-sm leading-tight">{item.name}</div>
+                  {item.link && (
+                    <a 
+                      href={item.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      onClick={(e) => e.stopPropagation()} 
+                      className="p-1 text-indigo-500 hover:bg-indigo-100 rounded transition-colors"
+                      title="Открыть ссылку"
+                    >
+                      <ExternalLinkIcon />
+                    </a>
+                  )}
+                </div>
                 <div className="text-[10px] font-medium opacity-60 tracking-tight">{item.quantity}</div>
               </div>
             </div>
