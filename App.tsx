@@ -111,9 +111,9 @@ const App: React.FC = () => {
   const handleDeleteUser = async (id: string) => {
     const isSelf = currentUser && (id === currentUser.id || (currentUser.name === 'admin' && id === 'master-admin'));
     if (id === 'master-admin' || isSelf) {
-      return alert("Вы не можете удалить этого пользователя.");
+      return alert("Вы не можете удалить системного администратора или себя.");
     }
-    if (window.confirm("Удалить сотрудника из базы?")) { 
+    if (window.confirm("Удалить сотрудника?")) { 
       await api.deleteUser(id); 
       await refreshData(); 
     }
@@ -235,20 +235,26 @@ const App: React.FC = () => {
   }
 
   const renderRequestList = (reqs: MaterialRequest[]) => {
-    return reqs.map(req => (
-      <RequestCard 
-        key={req.id} 
-        request={req} 
-        role={currentUser.role} 
-        onUpdateItems={handleUpdateItems} 
-        onAddExpense={handleAddExpense} 
-        onDeleteExpense={(expId) => handleDeleteExpense(req.id, expId)}
-        onUpdateExpense={(exp) => handleUpdateExpense(req.id, exp)}
-        onDelete={handleDeleteRequest} 
-        onEdit={handleOpenForm} 
-        onMarkComplete={handleMarkComplete} 
-      />
-    ));
+    return reqs.map(req => {
+      // Пользователь может удалять только активные (не в архиве)
+      const isArchived = req.status === RequestStatus.COMPLETED || req.status === RequestStatus.CANCELLED;
+      const canDelete = currentUser.role === 'PURCHASER' || !isArchived;
+
+      return (
+        <RequestCard 
+          key={req.id} 
+          request={req} 
+          role={currentUser.role} 
+          onUpdateItems={handleUpdateItems} 
+          onAddExpense={handleAddExpense} 
+          onDeleteExpense={(expId) => handleDeleteExpense(req.id, expId)}
+          onUpdateExpense={(exp) => handleUpdateExpense(req.id, exp)}
+          onDelete={canDelete ? handleDeleteRequest : undefined} 
+          onEdit={handleOpenForm} 
+          onMarkComplete={handleMarkComplete} 
+        />
+      );
+    });
   };
 
   return (
@@ -344,11 +350,11 @@ const App: React.FC = () => {
                   <div className="space-y-6">
                     <div className="space-y-3">
                       {users.map(u => {
-                        const isSelf = currentUser && (u.id === currentUser.id || (u.name === 'admin' && currentUser.name === 'admin'));
+                        const isSelf = currentUser && (u.id === currentUser.id || u.name === 'admin');
                         return (
                           <div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                             <div><span className="font-black text-sm text-slate-900">{u.name}</span><p className="text-[9px] text-indigo-500 font-bold uppercase">{u.role}</p></div>
-                            {(!isSelf && u.id !== 'master-admin') && (
+                            {(!isSelf && u.id !== 'master-admin' && u.name !== 'admin') && (
                               <button onClick={() => handleDeleteUser(u.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>
                             )}
                           </div>
@@ -371,7 +377,7 @@ const App: React.FC = () => {
                           <div className="flex gap-2">
                             <button 
                               onClick={() => handleToggleProject(p)} 
-                              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${p.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${p.isActive ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'}`}
                             >
                               {p.isActive ? 'Скрыть' : 'Показать'}
                             </button>
