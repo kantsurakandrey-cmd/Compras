@@ -120,7 +120,6 @@ const RequestCard: React.FC<RequestCardProps> = ({
           base64Promise
         ]);
         
-        // Сохраняем URL из облака во временное состояние
         setPendingReceiptUrl(cloudUrl);
         
         setIsAnalyzing(true);
@@ -190,40 +189,49 @@ const RequestCard: React.FC<RequestCardProps> = ({
       </div>
 
       {/* Items List */}
-      <div className="space-y-1.5 mb-4">
+      <div className="space-y-2 mb-4">
         {request.items.map(item => (
           <div 
             key={item.id} 
             onClick={() => isPurchaser && toggleItem(item.id)}
-            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-              item.isBought ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
-            } ${isPurchaser ? 'cursor-pointer hover:border-indigo-200' : ''}`}
+            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+              item.isBought ? 'bg-emerald-50 border-emerald-100 opacity-70' : 'bg-white border-slate-100 shadow-sm'
+            } ${isPurchaser ? 'cursor-pointer hover:border-indigo-300' : ''}`}
           >
-            <div className="flex items-center gap-3 w-full">
-              {isPurchaser && (
-                <div className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                  item.isBought ? 'bg-emerald-500 border-emerald-500 text-white scale-110' : 'bg-white border-slate-300'
-                }`}>
-                  {item.isBought && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
-              )}
-              <div className={`flex-1 ${item.isBought ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+            {isPurchaser && (
+              <div className={`flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
+                item.isBought ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
+              }`}>
+                {item.isBought && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+            )}
+            
+            <div className="flex-1 flex justify-between items-center gap-2">
+              <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="font-bold text-sm leading-tight">{item.name}</div>
+                  <div className={`font-bold text-sm leading-tight truncate ${item.isBought ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                    {item.name}
+                  </div>
                   {item.link && (
                     <a 
                       href={item.link} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       onClick={(e) => e.stopPropagation()} 
-                      className="p-1 text-indigo-500 hover:bg-indigo-100 rounded transition-colors"
-                      title="Открыть ссылку"
+                      className="p-1 text-indigo-500 hover:bg-indigo-100 rounded transition-colors flex-shrink-0"
                     >
                       <ExternalLinkIcon />
                     </a>
                   )}
                 </div>
-                <div className="text-[10px] font-medium opacity-60 tracking-tight">{item.quantity}</div>
+              </div>
+              
+              <div className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-tight shadow-sm border transition-all ${
+                item.isBought 
+                  ? 'bg-slate-100 text-slate-400 border-slate-200' 
+                  : 'bg-white text-indigo-700 border-indigo-100'
+              }`}>
+                {item.quantity}
               </div>
             </div>
           </div>
