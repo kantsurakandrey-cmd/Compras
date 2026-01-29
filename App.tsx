@@ -111,7 +111,7 @@ const App: React.FC = () => {
   const handleDeleteUser = async (id: string) => {
     const isSelf = currentUser && (id === currentUser.id || (currentUser.name === 'admin' && id === 'master-admin'));
     if (id === 'master-admin' || isSelf) {
-      return alert("ОШИБКА: Вы не можете удалить самого себя или главного администратора!");
+      return alert("Вы не можете удалить этого пользователя.");
     }
     if (window.confirm("Удалить сотрудника из базы?")) { 
       await api.deleteUser(id); 
@@ -343,12 +343,17 @@ const App: React.FC = () => {
                 {managementTab === 'users' ? (
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      {users.map(u => (
-                        <div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <div><span className="font-black text-sm text-slate-900">{u.name}</span><p className="text-[9px] text-indigo-500 font-bold uppercase">{u.role}</p></div>
-                          <button onClick={() => handleDeleteUser(u.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>
-                        </div>
-                      ))}
+                      {users.map(u => {
+                        const isSelf = currentUser && (u.id === currentUser.id || (u.name === 'admin' && currentUser.name === 'admin'));
+                        return (
+                          <div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div><span className="font-black text-sm text-slate-900">{u.name}</span><p className="text-[9px] text-indigo-500 font-bold uppercase">{u.role}</p></div>
+                            {(!isSelf && u.id !== 'master-admin') && (
+                              <button onClick={() => handleDeleteUser(u.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100">
                       <h4 className="text-[10px] font-black text-indigo-900 uppercase mb-3 tracking-widest">Добавить сотрудника</h4>
@@ -361,12 +366,12 @@ const App: React.FC = () => {
                   <div className="space-y-6">
                     <div className="space-y-3">
                       {projects.map(p => (
-                        <div key={p.id} className={`flex justify-between items-center p-4 rounded-2xl border ${p.isActive ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                          <span className={`font-black text-sm ${!p.isActive ? 'line-through text-slate-400' : ''}`}>{p.name}</span>
+                        <div key={p.id} className={`flex justify-between items-center p-4 rounded-2xl border transition-all ${p.isActive ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                          <span className={`font-black text-sm ${!p.isActive ? 'line-through text-slate-400' : 'text-slate-900'}`}>{p.name}</span>
                           <div className="flex gap-2">
                             <button 
                               onClick={() => handleToggleProject(p)} 
-                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${p.isActive ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${p.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
                             >
                               {p.isActive ? 'Скрыть' : 'Показать'}
                             </button>
