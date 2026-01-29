@@ -83,7 +83,7 @@ const App: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     let user = users.find(u => u.name.toLowerCase() === loginName.toLowerCase() && u.password === loginPass);
-    if (!user && loginName.toLowerCase() === 'admin' && loginPass === 'admin') {
+    if (!user && loginName.toLowerCase() === 'admin' && loginPass === 'qwerty123') {
       user = { id: 'master-admin', name: 'admin', role: 'PURCHASER' };
     }
 
@@ -92,7 +92,7 @@ const App: React.FC = () => {
       localStorage.setItem('stroy_session_v4', JSON.stringify(user));
       setLoginError('');
     } else {
-      setLoginError('Ошибка. Попробуйте admin / admin');
+      setLoginError('Ошибка авторизации. Неверный логин или пароль.');
     }
   };
 
@@ -227,8 +227,8 @@ const App: React.FC = () => {
           <h1 className="text-4xl font-black text-indigo-900 mb-2">СтройЗакуп</h1>
           <p className="text-[10px] font-black text-slate-400 uppercase mb-10 tracking-[0.2em]">Supply Control System</p>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input type="text" placeholder="Логин (admin)" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50" value={loginName} onChange={e => setLoginName(e.target.value)} required />
-            <input type="password" placeholder="Пароль (admin)" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50" value={loginPass} onChange={e => setLoginPass(e.target.value)} required />
+            <input type="text" placeholder="Логин" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50" value={loginName} onChange={e => setLoginName(e.target.value)} required />
+            <input type="password" placeholder="Пароль" className="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none font-bold bg-slate-50" value={loginPass} onChange={e => setLoginPass(e.target.value)} required />
             {loginError && <p className="text-xs text-red-500 font-bold">{loginError}</p>}
             <button type="submit" className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black shadow-xl uppercase tracking-widest active:scale-[0.98]">Войти</button>
           </form>
@@ -239,7 +239,6 @@ const App: React.FC = () => {
 
   const renderRequestList = (reqs: MaterialRequest[]) => {
     return reqs.map(req => {
-      // Пользователь может удалять только активные (не в архиве)
       const isArchived = req.status === RequestStatus.COMPLETED || req.status === RequestStatus.CANCELLED;
       const canDelete = currentUser.role === 'PURCHASER' || !isArchived;
 
