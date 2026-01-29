@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialRequest, RequestStatus, User, RequestItem, Expense, Project } from './types';
 import RequestCard from './components/RequestCard';
-import { PlusIcon, UserIcon, TrashIcon, LogOutIcon, BuildingIcon, DatabaseIcon, ClockIcon, WalletIcon, CameraIcon } from './components/Icons';
+import { PlusIcon, UserIcon, TrashIcon, LogOutIcon, BuildingIcon, DatabaseIcon, ClockIcon, WalletIcon, CameraIcon, EditIcon } from './components/Icons';
 import { api } from './services/apiService';
 
 type SortType = 'date' | 'project';
@@ -109,10 +109,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (id === 'master-admin' || (currentUser && id === currentUser.id)) {
-      return alert("Вы не можете удалить самого себя или системного администратора");
+    const isSelf = currentUser && (id === currentUser.id || (currentUser.name === 'admin' && id === 'master-admin'));
+    if (id === 'master-admin' || isSelf) {
+      return alert("ОШИБКА: Вы не можете удалить самого себя или главного администратора!");
     }
-    if (window.confirm("Удалить сотрудника?")) { 
+    if (window.confirm("Удалить сотрудника из базы?")) { 
       await api.deleteUser(id); 
       await refreshData(); 
     }
@@ -131,7 +132,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (window.confirm("Удалить объект?")) { await api.deleteProject(id); await refreshData(); }
+    if (window.confirm("Удалить объект полностью?")) { await api.deleteProject(id); await refreshData(); }
   };
 
   const handleOpenForm = (req?: MaterialRequest) => {
@@ -178,7 +179,8 @@ const App: React.FC = () => {
     const req = requests.find(r => r.id === requestId);
     if (!req) return;
     if (window.confirm("Удалить этот чек?")) {
-      await api.updateRequest({ ...req, expenses: req.expenses.filter(e => e.id !== expenseId) });
+      const newExpenses = req.expenses.filter(e => e.id !== expenseId);
+      await api.updateRequest({ ...req, expenses: newExpenses });
       await refreshData();
     }
   };
@@ -213,43 +215,6 @@ const App: React.FC = () => {
     return { active: active.sort(sortFn), archive: archive.sort(sortFn) };
   }, [requests, currentUser, sortBy]);
 
-  const envDiagnostics = {
-    supabaseUrl: !!process.env.VITE_SUPABASE_URL,
-    supabaseKey: !!process.env.VITE_SUPABASE_ANON_KEY,
-    geminiKey: !!process.env.API_KEY
-  };
-
-  const sqlSchema = `
--- 1. Таблица пользователей
-create table users (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  password text not null,
-  role text not null check (role in ('REQUESTOR', 'PURCHASER')),
-  created_at timestamp with time zone default now()
-);
-
--- 2. Таблица объектов
-create table projects (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  is_active boolean default true,
-  created_at timestamp with time zone default now()
-);
-
--- 3. Таблица заявок
-create table requests (
-  id uuid default gen_random_uuid() primary key,
-  user_id text not null,
-  user_name text not null,
-  project_name text not null,
-  items jsonb not null,
-  expenses jsonb default '[]',
-  status text not null,
-  created_at timestamp with time zone default now(),
-  completed_at timestamp with time zone
-);`.trim();
-
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 font-black text-indigo-900 animate-pulse uppercase text-center px-4">Подключение...</div>;
 
   if (!currentUser) {
@@ -268,6 +233,23 @@ create table requests (
       </div>
     );
   }
+
+  const renderRequestList = (reqs: MaterialRequest[]) => {
+    return reqs.map(req => (
+      <RequestCard 
+        key={req.id} 
+        request={req} 
+        role={currentUser.role} 
+        onUpdateItems={handleUpdateItems} 
+        onAddExpense={handleAddExpense} 
+        onDeleteExpense={(expId) => handleDeleteExpense(req.id, expId)}
+        onUpdateExpense={(exp) => handleUpdateExpense(req.id, exp)}
+        onDelete={handleDeleteRequest} 
+        onEdit={handleOpenForm} 
+        onMarkComplete={handleMarkComplete} 
+      />
+    ));
+  };
 
   return (
     <div className="min-h-screen flex flex-col max-w-2xl mx-auto bg-white lg:rounded-3xl lg:my-8 lg:h-[calc(100vh-64px)] overflow-hidden shadow-2xl relative">
@@ -319,20 +301,7 @@ create table requests (
               )}
             </div>
             {filteredRequests.active.length === 0 ? <div className="text-center py-20 opacity-20 font-black uppercase text-sm tracking-[0.3em]">Пусто</div> : 
-              filteredRequests.active.map(req => (
-                <RequestCard 
-                  key={req.id} 
-                  request={req} 
-                  role={currentUser.role} 
-                  onUpdateItems={handleUpdateItems} 
-                  onAddExpense={handleAddExpense} 
-                  onDeleteExpense={(expId) => handleDeleteExpense(req.id, expId)}
-                  onUpdateExpense={(exp) => handleUpdateExpense(req.id, exp)}
-                  onDelete={handleDeleteRequest} 
-                  onEdit={handleOpenForm} 
-                  onMarkComplete={handleMarkComplete} 
-                />
-              ))
+              renderRequestList(filteredRequests.active)
             }
           </section>
         )}
@@ -340,7 +309,7 @@ create table requests (
         {activeTab === 'archive' && (
           <section>
             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">История</h2>
-            {filteredRequests.archive.map(req => <RequestCard key={req.id} request={req} role={currentUser.role} onUpdateItems={handleUpdateItems} onAddExpense={handleAddExpense} onDelete={handleDeleteRequest} />)}
+            {renderRequestList(filteredRequests.archive)}
           </section>
         )}
 
@@ -349,24 +318,12 @@ create table requests (
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
                <h3 className="text-xl font-black text-indigo-900 mb-6 flex items-center gap-2"><DatabaseIcon /> Конфигурация</h3>
                <div className="grid grid-cols-1 gap-4 mb-8">
-                 <div className={`p-4 rounded-3xl border flex items-center justify-between ${envDiagnostics.supabaseUrl ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                    <span className="text-[10px] font-black uppercase text-slate-400">Database URL</span>
-                    <span className="text-xs font-bold">{envDiagnostics.supabaseUrl ? 'OK' : 'MISSING'}</span>
-                 </div>
-                 <div className={`p-4 rounded-3xl border flex items-center justify-between ${envDiagnostics.supabaseKey ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                    <span className="text-[10px] font-black uppercase text-slate-400">Anon Key</span>
-                    <span className="text-xs font-bold">{envDiagnostics.supabaseKey ? 'OK' : 'MISSING'}</span>
+                 <div className={`p-4 rounded-3xl border flex items-center justify-between ${api.getSyncStatus().connected ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                    <span className="text-[10px] font-black uppercase text-slate-400">Database Status</span>
+                    <span className="text-xs font-bold">{api.getSyncStatus().connected ? 'OK' : 'ERROR'}</span>
                  </div>
                </div>
-
-               <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
-                 <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-4 tracking-widest">Шаг 1: Настройка таблиц</h4>
-                 <p className="text-[11px] opacity-70 mb-4 leading-relaxed">Если при добавлении ничего не происходит — нужно создать таблицы. Зайдите в Supabase → SQL Editor и выполните этот код:</p>
-                 <textarea readOnly className="w-full h-40 bg-slate-800 rounded-xl p-4 text-[10px] font-mono text-emerald-400 outline-none border border-slate-700" value={sqlSchema} />
-                 
-                 <h4 className="text-[10px] font-black text-indigo-400 uppercase mt-8 mb-4 tracking-widest">Шаг 2: Хранилище чеков</h4>
-                 <p className="text-[11px] opacity-70 leading-relaxed">Зайдите в Storage → New Bucket. Создайте бакет с именем <code className="bg-slate-700 px-1 rounded">receipts</code> и сделайте его <b>Public</b>.</p>
-               </div>
+               <p className="text-[11px] text-slate-500 leading-relaxed">Если приложение не сохраняет данные, убедитесь что в Supabase созданы таблицы users, projects и requests через SQL Editor.</p>
             </div>
           </section>
         )}
@@ -386,7 +343,6 @@ create table requests (
                 {managementTab === 'users' ? (
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      {users.length === 0 && <p className="text-[10px] text-center opacity-30 font-bold uppercase py-4">Нет записей в базе</p>}
                       {users.map(u => (
                         <div key={u.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
                           <div><span className="font-black text-sm text-slate-900">{u.name}</span><p className="text-[9px] text-indigo-500 font-bold uppercase">{u.role}</p></div>
@@ -404,11 +360,18 @@ create table requests (
                 ) : (
                   <div className="space-y-6">
                     <div className="space-y-3">
-                      {projects.length === 0 && <p className="text-[10px] text-center opacity-30 font-bold uppercase py-4">Список объектов пуст</p>}
                       {projects.map(p => (
-                        <div key={p.id} className="flex justify-between items-center p-4 rounded-2xl border bg-white border-slate-100">
-                          <span className="font-black text-sm">{p.name}</span>
-                          <button onClick={() => handleDeleteProject(p.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>
+                        <div key={p.id} className={`flex justify-between items-center p-4 rounded-2xl border ${p.isActive ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                          <span className={`font-black text-sm ${!p.isActive ? 'line-through text-slate-400' : ''}`}>{p.name}</span>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleToggleProject(p)} 
+                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${p.isActive ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                            >
+                              {p.isActive ? 'Скрыть' : 'Показать'}
+                            </button>
+                            <button onClick={() => handleDeleteProject(p.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><TrashIcon /></button>
+                          </div>
                         </div>
                       ))}
                     </div>
