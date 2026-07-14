@@ -3,5 +3,8 @@
   "description": "Удобное приложение для управления закупками стройматериалов, отслеживания заказов и организации чеков.",
   "requestFramePermissions": [
     "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

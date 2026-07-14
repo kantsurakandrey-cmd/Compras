@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account detail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["REQUESTOR", "PURCHASER"] }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Construction site/project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "isActive"]
+    },
+    "MaterialRequest": {
+      "title": "Material Request",
+      "description": "A procurement request for materials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "projectName": { "type": "string" },
+        "items": { "type": "array" },
+        "status": { "type": "string", "enum": ["PENDING", "PARTIAL", "COMPLETED", "CANCELLED"] },
+        "createdAt": { "type": "number" },
+        "completedAt": { "type": "number" },
+        "expenses": { "type": "array" }
+      },
+      "required": ["id", "userId", "userName", "projectName", "items", "status", "createdAt", "expenses"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Registered app users"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Active/inactive projects"
+    },
+    "/requests/{requestId}": {
+      "schema": "MaterialRequest",
+      "description": "Procurement requests"
+    }
+  }
+}

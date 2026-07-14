@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { MaterialRequest, RequestStatus, AppRole, RequestItem, Expense } from '../types';
-import { ClockIcon, ExternalLinkIcon, TrashIcon, EditIcon, BuildingIcon, WalletIcon, UserIcon } from './Icons';
+import { ClockIcon, ExternalLinkIcon, TrashIcon, EditIcon, BuildingIcon, WalletIcon, UserIcon, CameraIcon } from './Icons';
 import { api } from '../services/apiService';
 
 interface RequestCardProps {
@@ -15,6 +14,9 @@ interface RequestCardProps {
   onEdit?: (request: MaterialRequest) => void;
   onCancel?: (id: string) => void;
   onMarkComplete?: (id: string) => void;
+  isScanning: boolean;
+  scanningRequestId: string | null;
+  onScanReceipt: (requestId: string, file: File) => void;
 }
 
 const statusLabels: Record<RequestStatus, string> = {
@@ -43,7 +45,10 @@ const RequestCard: React.FC<RequestCardProps> = ({
   onDeleteExpense,
   onDelete, 
   onEdit,
-  onMarkComplete
+  onMarkComplete,
+  isScanning,
+  scanningRequestId,
+  onScanReceipt
 }) => {
   const isPurchaser = role === 'PURCHASER';
   const canEdit = !isPurchaser && (request.status === RequestStatus.PENDING || request.status === RequestStatus.PARTIAL);
@@ -52,11 +57,21 @@ const RequestCard: React.FC<RequestCardProps> = ({
   const [expenseAmount, setExpenseAmount] = useState('');
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const toggleItem = (itemId: string) => {
     if (!isPurchaser) return;
-    const newItems = request.items.map(item => 
-      item.id === itemId ? { ...item, isBought: !item.isBought } : item
-    );
+    const newItems = (request.items || []).map(item => {
+      if (item.id === itemId) {
+        const isBought = !item.isBought;
+        return { 
+          ...item, 
+          isBought, 
+          boughtAt: isBought ? Date.now() : undefined 
+        };
+      }
+      return item;
+    });
     onUpdateItems(request.id, newItems);
   };
 
@@ -64,7 +79,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
     const amount = parseFloat(expenseAmount) || 0;
     
     if (editingExpenseId && onUpdateExpense) {
-      const original = request.expenses.find(e => e.id === editingExpenseId);
+      const original = (request.expenses || []).find(e => e.id === editingExpenseId);
       if (original) {
         onUpdateExpense({
           ...original,
@@ -92,7 +107,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
     setShowExpenseForm(true);
   };
 
-  const totalSum = request.expenses.reduce((acc, exp) => acc + exp.amount, 0);
+  const totalSum = (request.expenses || []).reduce((acc, exp) => acc + exp.amount, 0);
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border p-4 mb-4 transition-all ${
@@ -141,7 +156,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
 
       {/* Items List */}
       <div className="space-y-2 mb-4">
-        {request.items.map(item => (
+        {(request.items || []).map(item => (
           <div 
             key={item.id} 
             onClick={() => isPurchaser && toggleItem(item.id)}
@@ -150,11 +165,18 @@ const RequestCard: React.FC<RequestCardProps> = ({
             } ${isPurchaser ? 'cursor-pointer hover:border-indigo-300' : ''}`}
           >
             {isPurchaser && (
-              <div className={`flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
-                item.isBought ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
-              }`}>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleItem(item.id);
+                }}
+                className={`flex-shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${
+                  item.isBought ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300'
+                }`}
+              >
                 {item.isBought && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-              </div>
+              </button>
             )}
             
             <div className="flex-1 flex justify-between items-center gap-2">
@@ -175,6 +197,11 @@ const RequestCard: React.FC<RequestCardProps> = ({
                     </a>
                   )}
                 </div>
+                {item.isBought && item.boughtAt && (
+                  <span className="text-[10px] text-emerald-600 font-bold mt-0.5 animate-in fade-in duration-300">
+                    Куплено: {formatDateTime(item.boughtAt)}
+                  </span>
+                )}
               </div>
               
               <div className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-tight shadow-sm border transition-all ${
@@ -190,7 +217,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
       </div>
 
       {/* Expenses Display */}
-      {request.expenses.length > 0 && (
+      {(request.expenses || []).length > 0 && (
         <div className="mb-4 pt-4 border-t border-slate-100">
            <div className="flex justify-between items-center mb-3">
              <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
@@ -198,20 +225,65 @@ const RequestCard: React.FC<RequestCardProps> = ({
              </div>
              <span className="text-sm font-black text-slate-900">{totalSum.toLocaleString('de-DE')} €</span>
            </div>
-           <div className="flex flex-wrap gap-2">
-              {request.expenses.map((exp) => (
-                <div key={exp.id} className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg flex items-center gap-3">
-                  <span className="text-xs font-black text-indigo-900">{exp.amount} €</span>
-                  {isPurchaser && (
-                    <div className="flex gap-1 border-l pl-2 border-slate-200">
-                      <button onClick={() => handleStartEditExpense(exp)} className="text-indigo-500 p-1 hover:bg-indigo-100 rounded transition-colors">
-                         <EditIcon />
-                      </button>
-                      <button onClick={() => onDeleteExpense?.(exp.id)} className="text-red-500 p-1 hover:bg-red-100 rounded transition-colors">
-                         <TrashIcon />
-                      </button>
+           <div className="space-y-2">
+              {(request.expenses || []).map((exp) => (
+                <div key={exp.id} className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl flex flex-col gap-1.5 text-xs shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1.5 font-black text-slate-800">
+                      {exp.shopName ? (
+                        <>
+                          <span className="p-1 bg-amber-500 text-white rounded-lg text-[9px] uppercase tracking-wider font-extrabold px-1.5">Чек</span>
+                          <span className="text-slate-900 font-extrabold uppercase tracking-tight">{exp.shopName}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="p-1 bg-slate-300 text-slate-700 rounded-lg text-[9px] uppercase tracking-wider font-extrabold px-1.5">Расход</span>
+                          <span className="text-slate-600 font-extrabold">Ручной ввод</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-indigo-900 bg-white border px-3 py-1 rounded-xl text-xs shadow-sm">{exp.amount} €</span>
+                      {isPurchaser && (
+                        <div className="flex gap-1 border-l pl-2 border-slate-200">
+                          <button onClick={() => handleStartEditExpense(exp)} className="text-indigo-500 p-1 hover:bg-indigo-100 rounded-lg transition-colors">
+                             <EditIcon />
+                          </button>
+                          <button onClick={() => onDeleteExpense?.(exp.id)} className="text-red-500 p-1 hover:bg-red-100 rounded-lg transition-colors">
+                             <TrashIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {exp.items && exp.items.length > 0 && (
+                    <div className="mt-2 border-t border-dashed border-slate-200 pt-2">
+                      <details className="group">
+                        <summary className="text-[10px] text-indigo-600 font-black hover:text-indigo-800 cursor-pointer flex justify-between items-center select-none uppercase tracking-wider">
+                          <span>Показать товары из чека ({exp.items.length})</span>
+                          <span className="transition-transform group-open:rotate-180 text-[8px]">▼</span>
+                        </summary>
+                        <div className="mt-2 space-y-1.5 pl-1 text-[11px] text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100 max-h-40 overflow-y-auto">
+                          {exp.items.map((it: any, idx) => (
+                            <div key={idx} className="flex justify-between items-center gap-4 border-b border-slate-100/50 pb-1 last:border-0 last:pb-0 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <span className="truncate font-bold text-slate-700 block">{it.name}</span>
+                                {it.price !== undefined && it.price !== null && (
+                                  <span className="text-[9px] text-indigo-500 font-bold block">{it.price} €</span>
+                                )}
+                              </div>
+                              <span className="font-black shrink-0 text-slate-500 text-[10px] bg-slate-50 border px-1.5 py-0.5 rounded-lg">{it.quantity}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     </div>
                   )}
+                  
+                  <div className="text-[8px] text-slate-400 font-bold mt-1.5">
+                    Добавлен: {formatDateTime(exp.createdAt)}
+                  </div>
                 </div>
               ))}
            </div>
@@ -224,11 +296,38 @@ const RequestCard: React.FC<RequestCardProps> = ({
           <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-black uppercase tracking-widest">
             <ClockIcon /> Создано: {formatDateTime(request.createdAt)}
           </div>
+          {request.status === RequestStatus.COMPLETED && request.completedAt && (
+            <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-black uppercase tracking-widest animate-in fade-in">
+              <ClockIcon /> Завершено: {formatDateTime(request.completedAt)}
+            </div>
+          )}
         </div>
         
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 items-center">
             {isPurchaser && request.status !== RequestStatus.CANCELLED && (
               <>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      onScanReceipt(request.id, file);
+                    }
+                    if (e.target) e.target.value = '';
+                  }} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isScanning}
+                  className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-amber-100 active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CameraIcon />
+                  {(isScanning && scanningRequestId === request.id) ? 'Сканирование...' : 'Сканировать Чек'}
+                </button>
                 <button 
                   onClick={() => {
                     if (showExpenseForm) resetForm();
@@ -276,6 +375,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
           </div>
         )}
       </div>
+
     </div>
   );
 };

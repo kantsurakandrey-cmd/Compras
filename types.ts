@@ -12,6 +12,7 @@ export interface RequestItem {
   quantity: string;
   link?: string;
   isBought: boolean;
+  boughtAt?: number;
 }
 
 export interface User {
@@ -30,6 +31,8 @@ export interface Project {
 export interface Expense {
   id: string;
   amount: number;
+  shopName?: string;
+  items?: { name: string; quantity: string }[];
   receiptImage?: string;
   createdAt: number;
 }
